@@ -23,6 +23,11 @@ body {
     line-height: 1.4;
 }
 
+html,
+body {
+    height: 100%;
+}
+
 a {
     color: #00e;
 }
@@ -65,15 +70,41 @@ textarea {
    Author's custom styles
    ========================================================================== */
 
+#colorWrapper {
+    perspective: 50%;
+}
+
 #colorMain {
-    display: table-cell;
+    display: block;
     text-align: center;
-    vertical-align: middle;
     
     width: 90%;
     height: 90%;
     
-    background: #666;
+    margin: auto;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+
+    background-color: rgba(181,216,235, 0.8);
+    background-image: url(../img/pattern.svg);
+}
+
+#colorMainTextWrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;    
+}
+
+#out {
+    height: 2em;
+    width: 80%;
+    
+    margin: auto;
+    position: absolute;
+    top: 0; left: 0; bottom: 0; right: 0;
+    
+    font-weight: 200%;
+    font-size: 150%;
 }
 
 

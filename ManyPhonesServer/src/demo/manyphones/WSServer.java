@@ -7,6 +7,7 @@ package demo.manyphones;
 
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.Optional;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
@@ -17,8 +18,8 @@ import org.java_websocket.server.WebSocketServer;
  */
 public class WSServer extends WebSocketServer {
 
-    
-    
+    Optional<WebSocket> _display = Optional.empty();
+
     public WSServer(int port) throws UnknownHostException {
         super(new InetSocketAddress(port));
     }
@@ -36,6 +37,20 @@ public class WSServer extends WebSocketServer {
     @Override
     public void onMessage(WebSocket ws, String string) {
         System.out.println("Message\t" + ws.getRemoteSocketAddress() + "\t" + string);
+        if (string.startsWith("REGISTER_SERVER")) {
+            if(_display.isPresent()){
+                _display.get().send("DISCONNECT");
+            }
+            _display = Optional.of(ws);
+        } else if (_display.isPresent()) {
+            if (ws == _display.get()) {
+                // From the display server, send to everyone:
+                sendAllBut(string, ws);
+            } else {
+                // From a client, forward it to the display server:
+                ws.send(string);
+            }
+        }
     }
 
     @Override
@@ -48,10 +63,16 @@ public class WSServer extends WebSocketServer {
         }
     }
 
-    void sendAll(String in) {
-        for(WebSocket c : this.connections()){
-            c.send(in);
+    void sendAllBut(String in, WebSocket notSend) {
+        for (WebSocket c : this.connections()) {
+            if (c != notSend) {
+                c.send(in);
+            }
         }
+    }
+
+    void sendAll(String in) {
+        sendAllBut(in, null);
     }
 
 }

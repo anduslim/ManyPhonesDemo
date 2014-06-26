@@ -8,8 +8,6 @@ package demo.manyphones;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.UnknownHostException;
-import java.util.logging.Level;
 
 /**
  *
@@ -27,13 +25,9 @@ public class ManyPhonesServer {
             BufferedReader sysin = new BufferedReader(new InputStreamReader(System.in));
             while (true) {
                 String in = sysin.readLine();
-                _server.sendAll(in);
-                if (in.equals("exit")) {
+                if (in.equals("quit")) {
+                    _server.sendAll("DISCONNECT");
                     _server.stop();
-                    break;
-                } else if (in.equals("restart")) {
-                    _server.stop();
-                    _server.start();
                     break;
                 }
             }

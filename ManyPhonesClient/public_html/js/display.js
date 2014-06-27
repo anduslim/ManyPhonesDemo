@@ -57,7 +57,7 @@ function constructWebsocket() {
                         deviceSlotsUUID[i] = null;
                         ws.send("DISCONNECT," + desc["uuid"] + ",Timeout");
                         $(desc["dom"]).css("backgroundColor", defaultColor);
-                        $(device["dom"]).transition({rotateX: '0deg', rotateY: '0deg', rotateZ: '0deg'}, 0);
+                        $(device["dom"]).transition({rotateX: '0', rotateY: '0', rotateZ: '0'}, 0);
                     }
                 }
             }

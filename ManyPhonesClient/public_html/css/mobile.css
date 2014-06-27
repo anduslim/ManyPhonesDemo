@@ -71,7 +71,7 @@ textarea {
    ========================================================================== */
 
 #colorWrapper {
-    perspective: 50%;
+    perspective: 200px;
 }
 
 #colorMain {

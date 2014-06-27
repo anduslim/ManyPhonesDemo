@@ -39,16 +39,20 @@ public class WSServer extends WebSocketServer {
         System.out.println("Message\t" + ws.getRemoteSocketAddress() + "\t" + string);
         if (string.startsWith("REGISTER_SERVER")) {
             if(_display.isPresent()){
-                _display.get().send("DISCONNECT");
+                System.err.println("Removing old Display: " + ws.getRemoteSocketAddress().toString());
+                _display.get().send("DISCONNECT,ALL,Replaced by new Server");
             }
             _display = Optional.of(ws);
+            System.err.println("New Display: " + ws.getRemoteSocketAddress().toString());
         } else if (_display.isPresent()) {
             if (ws == _display.get()) {
                 // From the display server, send to everyone:
+                System.err.println("Server Out: " + string);
                 sendAllBut(string, ws);
             } else {
                 // From a client, forward it to the display server:
-                ws.send(string);
+                System.err.println("Server In: " + string);
+                _display.get().send(string);
             }
         }
     }

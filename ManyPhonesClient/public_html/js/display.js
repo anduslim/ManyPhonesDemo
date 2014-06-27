@@ -1,17 +1,19 @@
 var connected = false;
-var deviceSlots = [];
-var deviceSlotsUUID = [];
+var deviceSlots = new Array();
+var deviceSlotsUUID = new Array();
 var uuidToDevice = new Array();
 var colorRemaining = ["#AEC6CF", "#836953", "#C23B22", "#F49AC2", "#03C03C", "#FDFD96", "#FF6961", "#CB99C9", "#B39EB5", "#966FD6", "#FFD1DC", "#DEA5A4", "#B19CD9", "#CFCFC4", "#779ECB", "#77DD77", "#FFB347"];
-var deviceMax = 16;
+var deviceMaxCount = 2;
 
 $(document).ready(function() {
     if (window.WebSocket) {
-        deviceSlots = constructDeviceDisplay(deviceMax);
+        deviceSlots = constructDeviceDisplay(deviceMaxCount);
         deviceSlotsUUID = []
         for (var i = 0; i < deviceSlots.length; ++i){
-            deviceSlotsUUID[i] = "";
+            deviceSlotsUUID.push("");
         }
+        console.log(deviceSlotsUUID.length);
+        console.log(deviceSlotsUUID);
         ws = constructWebsocket();
     } else {
         alert("Your Browser does not support the necessary APIs");
@@ -23,7 +25,7 @@ function constructDeviceDisplay(count) {
     while(++c <= count){
         $("#container").append('<div class="deviceHolder"><div class="device"><div class="figure">' + c + '</div></div></div>');
     }
-    return $("#container").children('.figure');
+    return $("#container").children().children().children('.figure');
 }
 
 function constructWebsocket() {
@@ -33,8 +35,14 @@ function constructWebsocket() {
         $("#out").html("Connected!");
         // We are the server!
         ws.send("REGISTER_SERVER");
-        // Force everyone to re-register
+        // Force everyone to re-register:
         ws.send("WHOAREYOU");
+        // Change the update period:
+        ws.send("UPDATE_PERIOD,200");
+
+        $("#vibrate").click(function(){
+            ws.send("VIBRATE");
+        })
     };
 
     // Log errors
@@ -51,6 +59,83 @@ function constructWebsocket() {
         var data = e.data.split(",");
         if (data[0] === "DISCOVER") {
             var uuid = data[1];
+
+            // Find it a color and a number:
+
+            console.log(deviceSlotsUUID.length);
+
+            var i = 0;
+            for(i = 0; i < deviceSlotsUUID.length; ++i){
+                if(deviceSlotsUUID[i] === ""){
+                    break;
+                }
+            }
+            var deviceColor = colorRemaining[Math.floor(Math.random() * colorRemaining.length)];
+            
+            if(i == deviceSlotsUUID.length){
+                ws.send("DISCONNECT," + uuid + ",No empty slots on the server.");
+                return;
+            }
+            deviceNum = i;
+
+            console.log("Assigning " + uuid + " to " + i);
+            
+            // Create the device metadata struct:
+            deviceDescriptor = new Array();
+            deviceDescriptor["color"] = deviceColor;
+            deviceDescriptor["uuid"] = uuid;
+            deviceDescriptor["num"] = deviceNum;
+            deviceDescriptor["dom"] = deviceSlots[deviceNum];
+            deviceDescriptor["lastaccess"] = new Date();
+            uuidToDevice[uuid] = deviceDescriptor;
+            // Mark this slot as taken:
+            deviceSlotsUUID[deviceNum] = deviceSlotsUUID;
+            // Change the background color of the appropriate box:
+            $(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
+            // Notify the device of its status:
+            ws.send("ASSIGN," + uuid + "," + deviceNum + "," + deviceColor);
+        } else if (data[0] == "REDISCOVER") {
+            var deviceUUID = data[1];
+            var deviceColor = data[2];
+            var deviceNum = data[3];
+
+            // Add them to the device table, if there is no conflict:
+            if(deviceNum > deviceSlotsUUID.length || deviceNum < 0){
+                ws.send("DISCONNECT," + deviceUUID + ",Incorrect device parameters.");
+                return;
+            } 
+            if (deviceSlotsUUID[deviceNum] == "" || deviceSlotsUUID[deviceNum] == deviceUUID){
+                console.log("Reassigning " + uuid + " to " + i);
+                // Create the device metadata struct:
+                deviceDescriptor = new Array();
+                deviceDescriptor["color"] = deviceColor;
+                deviceDescriptor["uuid"] = deviceUUID;
+                deviceDescriptor["num"] = deviceNum;
+                deviceDescriptor["dom"] = deviceSlots[deviceNum];
+                deviceDescriptor["lastaccess"] = new Date();
+                uuidToDevice[uuid] = deviceDescriptor;
+                // Mark this slot as taken:
+                deviceSlotsUUID[deviceNum] = deviceSlotsUUID;
+                // Change the background color of the appropriate box:
+                $(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
+            } else {
+                ws.send("DISCONNECT," + deviceUUID + ",Another device is using your old slot. Refresh to try again.");
+                return;
+            }
+        } else if (data[0] == "XYZ") {
+                var deviceUUID = data[1];
+                if(uuidToDevice[deviceUUID]){
+                    device = uuidToDevice[deviceUUID];
+                    device["lastaccess"] = new Date();
+                    $(device["dom"]).transition({rotateX: (-1 * data[2]) + 'deg', rotateY: (1 * data[3]) + 'deg', rotateZ: data[4] + 'deg'}, 0);
+                } else {
+                    ws.send("DISCONNECT," + deviceUUID + ",You are unknown to the server. Refresh to request a slot.");
+                    return;
+                }
+        } else if (data[0] == "DISCONNECT") {
+            connected = false;
+            ws.close();
+            alert("Disconnected.")
         }
     };
 }

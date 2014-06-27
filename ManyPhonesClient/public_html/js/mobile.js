@@ -23,7 +23,7 @@ function constructWebsocket() {
         $("#out").html("Connected!");
         // If we have been previously registered, reregister with same color:
         if (deviceColor) {
-            ws.send("REDISCOVER," + deviceUUID + "," + deviceColor);
+            ws.send("REDISCOVER," + deviceUUID + "," + deviceColor + "," + deviceNum);
         } else {
             ws.send("DISCOVER," + deviceUUID);
         }
@@ -55,21 +55,28 @@ function constructWebsocket() {
         var data = e.data.split(",");
         if (data[0] === "VIBRATE") {
             navigator.vibrate([300, 300, 300, 300, 300]);
-        } else if (data[0] === "ASSIGN" && data.length >= 3) {
-            deviceNum = data[1];
-            deviceColor = data[2];
+        } else if (data[0] === "ASSIGN" && data.length >= 4) {
+            if(deviceUUID !== data[1]){
+                return;
+            }
+            deviceNum = data[2];
+            deviceColor = data[3];
             $("#colorMain").css("backgroundColor", deviceColor);
-            $("#out").html(deviceNum);
+            $("#out").html((deviceNum * 1) + 1);
         } else if (data[0] === "UPDATE_PERIOD") {
             var newP = data[1] * 1;
             if(newP > 50 && newP < 5000){
                 UPDATE_PERIOD = newP;
             }
         } else if (data[0] === "WHOAREYOU") {
-            ws.send("REDISCOVER," + deviceUUID + "," + deviceColor);
-        } else if(data[0] === "DISCONNECT") {
+            if (deviceColor) {
+                ws.send("REDISCOVER," + deviceUUID + "," + deviceColor + "," + deviceNum);
+            } else {
+                ws.send("DISCOVER," + deviceUUID);
+            }
+        } else if(data[0] === "DISCONNECT" && (data[1] === deviceUUID || data[1] === "ALL")) {
             $("#colorMain").css("backgroundColor", "#FF0000");
-            $("#out").html("You have been disconnected.\n" + data[1]);
+            $("#out").html("You have been disconnected.\n" + data[2]);
         }
     };
 }
@@ -88,12 +95,15 @@ function generateUUID(){
 
 function handleOrientation(event) {
     // var absolute = event.absolute;
-    var alpha = event.alpha * -1;
-    var beta = event.beta * -1;
+    var alpha = 0; //event.alpha
+    var beta = event.beta;
     var gamma = event.gamma * -1;
 
-    orientationMessages.push([beta, gamma, alpha]);
+    while(orientationMessages.length > 100){
+        orientationMessages.shift();
+    }
 
+    orientationMessages.push([event.beta, event.gamma, event.alpha]);
     $("#colorMain").transition({rotateX: beta + 'deg', rotateY: gamma + 'deg', rotateZ: alpha + 'deg'}, 0);
     // Do stuff with the new orientation data
 }

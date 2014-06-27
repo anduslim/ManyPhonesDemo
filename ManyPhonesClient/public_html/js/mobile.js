@@ -3,12 +3,18 @@ var deviceNum = null;
 var deviceUUID = null;
 var orientationMessages = [];
 var publishUpdates = true;
-var UPDATE_PERIOD = 1000;
+var UPDATE_PERIOD = 50;
 
 $(document).ready(function() {
-    deviceUUID = generateUUID();
     // Add the WebSocket connection first:
-    if (window.WebSocket && window.DeviceOrientationEvent && navigator.vibrate) {
+    if (window.WebSocket && window.DeviceOrientationEvent && navigator.vibrate && localStorage) {
+
+        if(!localStorage.dUUID){
+	    localStorage.dUUID = generateUUID();
+	}
+	
+        deviceUUID = localStorage.dUUID;
+	
         ws = constructWebsocket();
         window.addEventListener("deviceorientation", handleOrientation, true);
     } else {
@@ -49,6 +55,11 @@ function constructWebsocket() {
         constructWebsocket(); // Reopen connection
     };
 
+    ws.onclose = function(error) {
+        $("#out").html("Closed, retrying...");
+        constructWebsocket(); // Reopen connection
+    };
+
     // Log messages from the server
     ws.onmessage = function(e) {
         console.log('Server: ' + e.data);
@@ -65,7 +76,7 @@ function constructWebsocket() {
             $("#out").html((deviceNum * 1) + 1);
         } else if (data[0] === "UPDATE_PERIOD") {
             var newP = data[1] * 1;
-            if(newP > 50 && newP < 5000){
+            if(newP > 10 && newP < 5000){
                 UPDATE_PERIOD = newP;
             }
         } else if (data[0] === "WHOAREYOU") {

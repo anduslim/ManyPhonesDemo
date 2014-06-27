@@ -33,7 +33,7 @@ function constructWebsocket() {
                 oM = orientationMessages.pop();
                 orientationMessages = [];
                 if (ws.readyState === 1 && deviceColor) {
-                    ws.send("XYZ," + deviceUUID + "," + oM.join(","));
+                    ws.send("XYZ," + deviceUUID  + "," + deviceNum + "," + oM.join(","));
                 }
             }
             setTimeout(pushUpdate, UPDATE_PERIOD);

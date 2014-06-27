@@ -1,16 +1,18 @@
 var connected = false;
 var deviceSlots = new Array();
 var deviceSlotsUUID = new Array();
-var uuidToDevice = new Array();
 var colorRemaining = ["#AEC6CF", "#836953", "#C23B22", "#F49AC2", "#03C03C", "#FDFD96", "#FF6961", "#CB99C9", "#B39EB5", "#966FD6", "#FFD1DC", "#DEA5A4", "#B19CD9", "#CFCFC4", "#779ECB", "#77DD77", "#FFB347"];
-var deviceMaxCount = 2;
+var deviceMaxCount = 16;
+var TIMEOUT = 5000;
+
+var defaultColor = "#AAA";
 
 $(document).ready(function() {
     if (window.WebSocket) {
         deviceSlots = constructDeviceDisplay(deviceMaxCount);
         deviceSlotsUUID = []
         for (var i = 0; i < deviceSlots.length; ++i){
-            deviceSlotsUUID.push("");
+            deviceSlotsUUID.push(null);
         }
         console.log(deviceSlotsUUID.length);
         console.log(deviceSlotsUUID);
@@ -38,11 +40,31 @@ function constructWebsocket() {
         // Force everyone to re-register:
         ws.send("WHOAREYOU");
         // Change the update period:
-        ws.send("UPDATE_PERIOD,200");
+        ws.send("UPDATE_PERIOD,50");
 
         $("#vibrate").click(function(){
             ws.send("VIBRATE");
         })
+
+        function pruneDevices() {
+            var nowTime = (new Date()).getTime();
+            console.log(deviceSlotsUUID);
+            for(var i = 0; i < deviceSlotsUUID.length; ++i) {
+                if(deviceSlotsUUID[i] != null){
+                    desc = deviceSlotsUUID[i];
+                    console.log("Device " + i + " last access " + (nowTime - desc["lastaccess"]));
+                    if(nowTime - desc["lastaccess"] > TIMEOUT){
+                        deviceSlotsUUID[i] = null;
+                        ws.send("DISCONNECT," + desc["uuid"] + ",Timeout");
+                        $(desc["dom"]).css("backgroundColor", defaultColor);
+                        $(device["dom"]).transition({rotateX: '0deg', rotateY: '0deg', rotateZ: '0deg'}, 0);
+                    }
+                }
+            }
+            setTimeout(pruneDevices, TIMEOUT);
+        }
+
+        pruneDevices();
     };
 
     // Log errors
@@ -55,7 +77,7 @@ function constructWebsocket() {
 
     // Log messages from the server
     ws.onmessage = function(e) {
-        console.log('Server: ' + e.data);
+        //console.log('Server: ' + e.data);
         var data = e.data.split(",");
         if (data[0] === "DISCOVER") {
             var uuid = data[1];
@@ -66,7 +88,7 @@ function constructWebsocket() {
 
             var i = 0;
             for(i = 0; i < deviceSlotsUUID.length; ++i){
-                if(deviceSlotsUUID[i] === ""){
+                if(deviceSlotsUUID[i] === null){
                     break;
                 }
             }
@@ -81,15 +103,14 @@ function constructWebsocket() {
             console.log("Assigning " + uuid + " to " + i);
             
             // Create the device metadata struct:
-            deviceDescriptor = new Array();
+            deviceDescriptor = new Object();
             deviceDescriptor["color"] = deviceColor;
             deviceDescriptor["uuid"] = uuid;
             deviceDescriptor["num"] = deviceNum;
             deviceDescriptor["dom"] = deviceSlots[deviceNum];
             deviceDescriptor["lastaccess"] = new Date();
-            uuidToDevice[uuid] = deviceDescriptor;
-            // Mark this slot as taken:
-            deviceSlotsUUID[deviceNum] = deviceSlotsUUID;
+            deviceSlotsUUID[deviceNum] = deviceDescriptor;
+            
             // Change the background color of the appropriate box:
             $(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
             // Notify the device of its status:
@@ -104,18 +125,17 @@ function constructWebsocket() {
                 ws.send("DISCONNECT," + deviceUUID + ",Incorrect device parameters.");
                 return;
             } 
-            if (deviceSlotsUUID[deviceNum] == "" || deviceSlotsUUID[deviceNum] == deviceUUID){
-                console.log("Reassigning " + uuid + " to " + i);
+            if (deviceSlotsUUID[deviceNum] == null || deviceSlotsUUID[deviceNum]["uuid"] == deviceUUID){
+                console.log("Reassigning " + deviceUUID + " to " + deviceNum);
                 // Create the device metadata struct:
-                deviceDescriptor = new Array();
+                deviceDescriptor = new Object();
                 deviceDescriptor["color"] = deviceColor;
                 deviceDescriptor["uuid"] = deviceUUID;
                 deviceDescriptor["num"] = deviceNum;
                 deviceDescriptor["dom"] = deviceSlots[deviceNum];
-                deviceDescriptor["lastaccess"] = new Date();
-                uuidToDevice[uuid] = deviceDescriptor;
-                // Mark this slot as taken:
-                deviceSlotsUUID[deviceNum] = deviceSlotsUUID;
+                deviceDescriptor["lastaccess"] = (new Date()).getTime();
+                deviceSlotsUUID[deviceNum] = deviceDescriptor;
+                
                 // Change the background color of the appropriate box:
                 $(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
             } else {
@@ -124,10 +144,12 @@ function constructWebsocket() {
             }
         } else if (data[0] == "XYZ") {
                 var deviceUUID = data[1];
-                if(uuidToDevice[deviceUUID]){
-                    device = uuidToDevice[deviceUUID];
-                    device["lastaccess"] = new Date();
-                    $(device["dom"]).transition({rotateX: (-1 * data[2]) + 'deg', rotateY: (1 * data[3]) + 'deg', rotateZ: data[4] + 'deg'}, 0);
+                var deviceNum = data[2] * 1;
+                
+                if(deviceSlotsUUID[deviceNum]["uuid"] == deviceUUID){
+                    device = deviceSlotsUUID[deviceNum];
+                    device["lastaccess"] = (new Date()).getTime();
+                    $(device["dom"]).transition({rotateX: (-1 * data[3]) + 'deg', rotateY: (1 * data[4]) + 'deg', rotateZ: data[5] + 'deg'}, 0);
                 } else {
                     ws.send("DISCONNECT," + deviceUUID + ",You are unknown to the server. Refresh to request a slot.");
                     return;

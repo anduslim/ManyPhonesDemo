@@ -2,8 +2,12 @@ var deviceColor = null;
 var deviceNum = null;
 var deviceUUID = null;
 var orientationMessages = [];
-var publishUpdates = true;
+var publishUpdates = false;
 var UPDATE_PERIOD = 50;
+var RECONNECT_TIMEOUT = 1000;
+var RECONNECT_TIMEOUT_START = 1000;
+var RECONNECT_TIMEOUT_MAX = 60000;
+var wsQueue = [];
 
 $(document).ready(function() {
     // Add the WebSocket connection first:
@@ -23,9 +27,24 @@ $(document).ready(function() {
 });
 
 function constructWebsocket() {
+    if(publishUpdates){
+        return;
+    }
+    
+    while(wsQueue.length > 0){
+         wsQueue.pop().close();
+    }
+    
     var ws = new WebSocket("ws://" + window.location.hostname + ":9999/");
-    ws.onopen = function() {
+    
+    
+    wsQueue.push(ws);
+        
+    ws.onopen = function() {        
         publishUpdates = true;
+        
+        RECONNECT_TIMEOUT = RECONNECT_TIMEOUT_START;
+
         $("#out").html("Connected!");
         // If we have been previously registered, reregister with same color:
         if (deviceColor) {
@@ -51,13 +70,17 @@ function constructWebsocket() {
     // Log errors
     ws.onerror = function(error) {
         ws.close();
+        publishUpdates = false;
         $("#out").html("Error, retrying...");
-        setTimeout(constructWebsocket, 1000); // Reopen connection
+        RECONNECT_TIMEOUT = Math.min(RECONNECT_TIMEOUT * 2, RECONNECT_TIMEOUT_MAX);
+        setTimeout(constructWebsocket, RECONNECT_TIMEOUT);
     };
 
     ws.onclose = function(error) {
+        publishUpdates = false;
         $("#out").html("Closed, retrying...");
-        setTimeout(constructWebsocket, 1000);
+        RECONNECT_TIMEOUT = Math.min(RECONNECT_TIMEOUT * 2, RECONNECT_TIMEOUT_MAX);
+        setTimeout(constructWebsocket, RECONNECT_TIMEOUT);
     };
 
     // Log messages from the server
@@ -65,7 +88,9 @@ function constructWebsocket() {
         console.log('Server: ' + e.data);
         var data = e.data.split(",");
         if (data[0] === "VIBRATE") {
-            navigator.vibrate([300, 300, 300, 300, 300]);
+            if(data[1] === "ALL" || data[1] === deviceUUID){
+                navigator.vibrate(300);
+            }
         } else if (data[0] === "ASSIGN" && data.length >= 4) {
             if(deviceUUID !== data[1]){
                 return;

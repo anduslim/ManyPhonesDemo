@@ -5,6 +5,10 @@ var colorRemaining = ["#AEC6CF", "#836953", "#C23B22", "#F49AC2", "#03C03C", "#F
 var deviceMaxCount = 16;
 var TIMEOUT = 5000;
 var UPDATE_PERIOD = 50;
+var VIBRATE_AREA = 200;
+var VIBRATE_CENTER = null;
+
+var wsQueue = [];
 
 var defaultColor = "#AAA";
 
@@ -18,6 +22,12 @@ $(document).ready(function() {
 		console.log(deviceSlotsUUID.length);
 		console.log(deviceSlotsUUID);
 		ws = constructWebsocket();
+                
+                $("#vibrate").css({width: VIBRATE_AREA + "px", height: VIBRATE_AREA + "px"})
+                var hPos = ($(document).width() - VIBRATE_AREA)/2 + "px";
+                var vPos = ($(document).height() - VIBRATE_AREA)/2 + "px";
+                $("#vibrate").css({left: hPos, top: vPos});
+                VIBRATE_CENTER = {left: $(document).width()/2, top: $(document).height()/2};
 	} else {
 		alert("Your Browser does not support the necessary APIs");
 	}
@@ -28,13 +38,39 @@ function constructDeviceDisplay(count) {
 	while(++c <= count){
 		$("#container").append('<div class="deviceHolder"><div class="device"><div class="figure">' + c + '</div></div></div>');
 	}
-	return $("#container").children().children().children('.figure');
+	return $("#container").children(); //.children().children('.figure');
+}
+
+function normAngle(_a) {
+    //console.log("In normAngle " + _a);
+    while(_a <= -45){_a += 90;}
+    while(_a > 45){_a -= 90;}
+    //console.log("Out normAngle" + _a);
+    return _a;
+}
+
+function angleToCoord(angle, coordMax){
+    var divRad = 50;
+    angle = normAngle(angle);
+    return ((angle + 45) / 90 * (coordMax - divRad * 2));
+}
+
+function hittest(jDOM){
+    jO1 = jDOM.offset();
+    jO1.left += jDOM.width()/2;
+    jO1.top += jDOM.height()/2;
+    return Math.pow(jO1.left - VIBRATE_CENTER.left, 2) + Math.pow(jO1.top - VIBRATE_CENTER.top, 2) < Math.pow(VIBRATE_AREA/2, 2);
 }
 
 function constructWebsocket() {
 	var ws = new WebSocket("ws://" + window.location.hostname + ":9999/");
 	ws.onopen = function() {
 		connected = true;
+                while(wsQueue.length > 0){
+                    wsQueue.pop().close();
+                }
+                wsQueue.push(ws);
+                
 		$("#out").html("Connected!");
 		// We are the server!
 		ws.send("REGISTER_SERVER");
@@ -44,21 +80,22 @@ function constructWebsocket() {
 		ws.send("UPDATE_PERIOD," + UPDATE_PERIOD);
 
 		$("#vibrate").click(function(){
-			ws.send("VIBRATE");
+			ws.send("VIBRATE,ALL");
 		})
 
 		function pruneDevices() {
 			var nowTime = (new Date()).getTime();
-			console.log(deviceSlotsUUID);
+			// console.log(deviceSlotsUUID);
 			for(var i = 0; i < deviceSlotsUUID.length; ++i) {
 				if(deviceSlotsUUID[i] != null){
 					desc = deviceSlotsUUID[i];
-					console.log("Device " + i + " last access " + (nowTime - desc["lastaccess"]));
+					// console.log("Device " + i + " last access " + (nowTime - desc["lastaccess"]));
 					if(nowTime - desc["lastaccess"] > TIMEOUT){
 						deviceSlotsUUID[i] = null;
+                                                console.log("Pruning " + i + " last access " + (nowTime - desc["lastaccess"]));
 						ws.send("DISCONNECT," + desc["uuid"] + ",Timeout");
-						$(desc["dom"]).css("backgroundColor", defaultColor);
-						$(desc["dom"]).transition({rotateX: '0', rotateY: '0', rotateZ: '0'}, 0);
+                                                $(desc["dom"]).css("display", "none");
+                                                $(desc["dom"]).children().children().css("backgroundColor", defaultColor);
 					}
 				}
 			}
@@ -113,11 +150,13 @@ function constructWebsocket() {
 			deviceSlotsUUID[deviceNum] = deviceDescriptor;
 			
 			// Change the background color of the appropriate box:
-			$(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
+			$(deviceDescriptor["dom"]).css("display", "table-cell");
+                        $(deviceDescriptor["dom"]).children().children().css("backgroundColor", deviceColor);
+                        
 			// Notify the device of its status:
 			ws.send("ASSIGN," + uuid + "," + deviceNum + "," + deviceColor);
 		ws.send("UPDATE_PERIOD," + UPDATE_PERIOD);
-		} else if (data[0] == "REDISCOVER") {
+		} else if (data[0] === "REDISCOVER") {
 			var deviceUUID = data[1];
 			var deviceColor = data[2];
 			var deviceNum = data[3];
@@ -139,24 +178,32 @@ function constructWebsocket() {
 				deviceSlotsUUID[deviceNum] = deviceDescriptor;
 				
 				// Change the background color of the appropriate box:
-				$(deviceDescriptor["dom"]).css("backgroundColor", deviceColor);
+				$(deviceDescriptor["dom"]).css("display", "table-cell");
+                                $(deviceDescriptor["dom"]).children().children().css("backgroundColor", deviceColor);
 			} else {
 				ws.send("DISCONNECT," + deviceUUID + ",Another device is using your old slot. Refresh to try again.");
 				return;
 			}
-		} else if (data[0] == "XYZ") {
+		} else if (data[0] === "XYZ") {
 				var deviceUUID = data[1];
 				var deviceNum = data[2] * 1;
 				
-				if(deviceSlotsUUID[deviceNum]["uuid"] == deviceUUID){
+				if(deviceSlotsUUID[deviceNum]["uuid"] === deviceUUID){
 					device = deviceSlotsUUID[deviceNum];
 					device["lastaccess"] = (new Date()).getTime();
-					$(device["dom"]).transition({rotateX: (-1 * data[3]) + 'deg', rotateY: (1 * data[4]) + 'deg', rotateZ: data[5] + 'deg'}, 0);
-				} else {
+					//$(device["dom"]).children().children().transition({rotateX: -1 * normAngle(data[3]) + 'deg', rotateY: -1 * normAngle(1 * data[4]) + 'deg'}, 0);
+                                        $(device["dom"]).children().children().css({rotateX: normAngle(-1 * data[3]) + 'deg', rotateY: -1 * normAngle(1 * data[4]) + 'deg'});
+                                        $(device["dom"]).transition({top: angleToCoord(-1 * data[3], $(document).height())  + 'px', left: angleToCoord(1 * data[4], $(document).width()) + 'px'}, 0);
+                                        
+                                        // If device position intersects the vibrate box:
+                                        if(hittest($(device["dom"]))){
+                                            ws.send("VIBRATE," + device["uuid"]);
+                                        }
+                                } else {
 					ws.send("DISCONNECT," + deviceUUID + ",You are unknown to the server. Refresh to request a slot.");
 					return;
 				}
-		} else if (data[0] == "DISCONNECT") {
+		} else if (data[0] === "DISCONNECT") {
 			connected = false;
 			ws.close();
 			alert("Disconnected.")

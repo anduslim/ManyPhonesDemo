@@ -71,7 +71,7 @@ textarea {
    ========================================================================== */
 
 #colorWrapper {
-    perspective: 200px;
+    /* perspective: 200px; */
 }
 
 #colorMain {
@@ -105,6 +105,10 @@ textarea {
     
     font-weight: 200%;
     font-size: 150%;
+}
+
+.advice {
+    font-size: 40%;
 }
 
 

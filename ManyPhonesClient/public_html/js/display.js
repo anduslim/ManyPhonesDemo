@@ -42,8 +42,10 @@ function constructDeviceDisplay(count) {
 }
 
 function normAngle(_a) {
-    while(_a < -45){_a += 90;}
+    //console.log("In normAngle " + _a);
+    while(_a <= -45){_a += 90;}
     while(_a > 45){_a -= 90;}
+    //console.log("Out normAngle" + _a);
     return _a;
 }
 
@@ -182,14 +184,15 @@ function constructWebsocket() {
 				ws.send("DISCONNECT," + deviceUUID + ",Another device is using your old slot. Refresh to try again.");
 				return;
 			}
-		} else if (data[0] == "XYZ") {
+		} else if (data[0] === "XYZ") {
 				var deviceUUID = data[1];
 				var deviceNum = data[2] * 1;
 				
 				if(deviceSlotsUUID[deviceNum]["uuid"] === deviceUUID){
 					device = deviceSlotsUUID[deviceNum];
 					device["lastaccess"] = (new Date()).getTime();
-					$(device["dom"]).children().children().transition({rotateX: -1 * normAngle(data[3]) + 'deg', rotateY: -1 * normAngle(1 * data[4]) + 'deg'}, 0);
+					//$(device["dom"]).children().children().transition({rotateX: -1 * normAngle(data[3]) + 'deg', rotateY: -1 * normAngle(1 * data[4]) + 'deg'}, 0);
+                                        $(device["dom"]).children().children().css({rotateX: normAngle(-1 * data[3]) + 'deg', rotateY: -1 * normAngle(1 * data[4]) + 'deg'});
                                         $(device["dom"]).transition({top: angleToCoord(-1 * data[3], $(document).height())  + 'px', left: angleToCoord(1 * data[4], $(document).width()) + 'px'}, 0);
                                         
                                         // If device position intersects the vibrate box:

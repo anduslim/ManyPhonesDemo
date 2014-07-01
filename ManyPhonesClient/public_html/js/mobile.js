@@ -52,12 +52,12 @@ function constructWebsocket() {
     ws.onerror = function(error) {
         ws.close();
         $("#out").html("Error, retrying...");
-        constructWebsocket(); // Reopen connection
+        setTimeout(constructWebsocket, 1000); // Reopen connection
     };
 
     ws.onclose = function(error) {
         $("#out").html("Closed, retrying...");
-        constructWebsocket(); // Reopen connection
+        setTimeout(constructWebsocket, 1000);
     };
 
     // Log messages from the server
@@ -73,7 +73,7 @@ function constructWebsocket() {
             deviceNum = data[2];
             deviceColor = data[3];
             $("#colorMain").css("backgroundColor", deviceColor);
-            $("#out").html((deviceNum * 1) + 1);
+            $("#out").html(((deviceNum * 1) + 1) + "<br /><span class='advice'>Disable your screen rotation for better performance.</span>");
         } else if (data[0] === "UPDATE_PERIOD") {
             var newP = data[1] * 1;
             if(newP > 10 && newP < 5000){
@@ -115,6 +115,6 @@ function handleOrientation(event) {
     }
 
     orientationMessages.push([event.beta, event.gamma, event.alpha]);
-    $("#colorMain").transition({rotateX: beta + 'deg', rotateY: gamma + 'deg', rotateZ: alpha + 'deg'}, 0);
+    // $("#colorMain").transition({rotateX: beta + 'deg', rotateY: gamma + 'deg', rotateZ: alpha + 'deg'}, 0);
     // Do stuff with the new orientation data
 }
